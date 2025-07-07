@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <title>CaseSim GO</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>🎮 CaseSim GO</h1>
+
+    <div class="status">
+      <p>💵 Saldo: <span id="balance">$50.00</span></p>
+      <p>⭐ XP: <span id="xp">0</span></p>
+      <p>🏆 Ranga: <span id="rank">Silver I</span></p>
+      <p>🎒 Ekwipunek: <span id="inventory-count">0</span></p>
+      <p>📈 Skrzynki otwarte: <span id="cases-opened">0</span></p>
+      <p>💎 Najdroższy drop: <span id="best-drop">$0.00</span></p>
+    </div>
+
+    <div class="buttons">
+      <button onclick="openCase()">🎁 Otwórz skrzynkę ($2.50)</button>
+      <button onclick="sellItems()">💰 Sprzedaj wszystko</button>
+      <button onclick="doDaily()">📝 Zadanie dzienne</button>
+      <select id="case-select"></select>
+      <label><input type="checkbox" id="modeToggle" /> Tryb realistyczny</label>
+    </div>
+
+    <div id="log" class="log"></div>
+    <div id="history" class="log"><h3>📜 Historia dropów:</h3></div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
