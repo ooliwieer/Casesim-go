@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CaseSim GO - Symulator otwierania skrzynek</title>
+<style>
+  body { font-family: Arial, sans-serif; background:#121212; color:#eee; margin:0; padding:0; }
+  header { background:#222; padding:10px; text-align:center; font-size:24px; font-weight:bold; }
+  main { padding:20px; max-width:600px; margin: auto; }
+  select, button { font-size:16px; padding:8px; margin:5px 0; width: 100%; box-sizing: border-box; }
+  #balance, #xp, #rank { font-weight: bold; margin-bottom:10px; }
+  #inventory { margin-top:15px; max-height:200px; overflow-y:auto; background:#222; padding:10px; border-radius:6px; }
+  .skin { border-bottom: 1px solid #444; padding:5px 0; display:flex; justify-content: space-between; }
+  .skin-name { }
+  .skin-price { color:#4caf50; }
+  #history { margin-top:20px; max-height:150px; overflow-y:auto; background:#222; padding:10px; border-radius:6px; font-size:14px; }
+  label { display:block; margin-top:10px; }
+  #dailyTask { margin-top: 15px; }
+  #realisticMode { margin-top: 15px; }
+</style>
+</head>
+<body>
+<header>CaseSim GO - Symulator otwierania skrzynek</header>
+<main>
+  <div id="balance">Saldo: $50.00</div>
+  <div id="xp">XP: 0</div>
+  <div id="rank">Ranga: Silver I</div>
+
+  <label for="caseSelect">Wybierz skrzynkę:</label>
+  <select id="caseSelect"></select>
+  <button id="openCaseBtn">🎁 Otwórz skrzynkę</button>
+
+  <button id="sellBtn">💰 Sprzedaj wszystko</button>
+
+  <button id="dailyTask">📝 Wykonaj zadanie dzienne (otwórz 3 skrzynki)</button>
+
+  <label><input type="checkbox" id="realisticMode" /> Tryb realistyczny (bardziej realne procenty)</label>
+
+  <div id="inventory"></div>
+
+  <h3>Historia dropów:</h3>
+  <div id="history"></div>
+</main>
+
+<script>
+(() => {
+  // Skins i ich wartości (kolory, ceny i rarity)
+  const SKINS = [
+    // Blue (Mil-Spec)
+    {name:"Glock-18 | Bunsen Burner", rarity:"Blue", price:0.3},
+    {name:"P250 | Steel Disruption", rarity:"Blue", price:0.4},
+    {name:"UMP-45 | Corporal", rarity:"Blue", price:0.5},
+    {name:"MAC-10 | Indigo", rarity:"Blue", price:0.5},
+    // Purple (Restricted)
+    {name:"AWP | Phobos", rarity:"Purple", price:2},
+    {name:"Desert Eagle | Bronze Deco", rarity:"Purple", price:1.8},
+    {name:"Nova | Antique", rarity:"Purple", price:2.2},
+    {name:"Tec-9 | Jambiya", rarity:"Purple", price:1.9},
+    // Pink (Classified)
+    {name:"AK-47 | Redline", rarity:"Pink", price:15},
+    {name:"M4A1-S | Cyrex", rarity:"Pink", price:14},
+    {name:"FAMAS | Pulse", rarity:"Pink", price:13},
+    {name:"SG 553 | Cyrex", rarity:"Pink", price:12},
+    // Red (Covert)
+    {name:"M4A4 | Howl", rarity:"Red", price:150},
+    {name:"AK-47 | Fire Serpent", rarity:"Red", price:140},
+    {name:"AWP | Dragon Lore", rarity:"Red", price:180},
+    {name:"Desert Eagle | Blaze", rarity:"Red", price:120},
+    // Gold (Knife)
+    {name:"Karambit | Doppler", rarity:"Gold", price:800},
+    {name:"Bayonet | Marble Fade", rarity:"Gold", price:750},
+    {name:"Flip Knife | Tiger Tooth", rarity:"Gold", price:700},
+    {name:"M9 Bayonet | Crimson Web", rarity:"Gold", price:900}
+  ];
+
+  // Skrzynki i ich ceny
+  const CASES = [
+    {name:"Clutch Case", price:2.5},
+    {name:"Prisma Case", price:2.3},
+    {name:"Operation Bravo Case", price:1.8},
+    {name:"Gamma Case", price:2.0}
+  ];
+
+  // Rangi i XP do nich
+  const RANKS = [
+    {name:"Silver I", xpNeeded:0},
+    {name:"Silver II", xpNeeded:50},
+    {name:"Silver III", xpNeeded:150},
+    {name:"Silver IV", xpNeeded:300},
+    {name:"Silver Elite", xpNeeded:500},
+    {name:"Silver Elite Master", xpNeeded:800},
+    {name:"Gold Nova I", xpNeeded:1200},
+    {name:"Gold Nova II", xpNeeded:1700},
+    {name:"Gold Nova III", xpNeeded:2300},
+    {name:"Gold Nova Master", xpNeeded:3000},
+    {name:"Master Guardian I", xpNeeded:3800},
+    {name:"Master Guardian II", xpNeeded:4700},
+    {name:"Master Guardian Elite", xpNeeded:5700},
+    {name:"Distinguished Master Guardian", xpNeeded:6800},
+    {name:"Legendary Eagle", xpNeeded:8000},
+    {name:"Legendary Eagle Master", xpNeeded:9300},
+    {name:"Supreme Master First Class", xpNeeded:10700},
+    {name:"Global Elite", xpNeeded:12200}
+  ];
+
+  // Procenty dropów w trybie normalnym i realistycznym (sumują się do 100%)
+  // Zwiększamy trochę szansę na Pink i wyżej
+  const DROP_CHANCES = {
+    normal: [
+      {rarity:"Gold", chance:0.9},
+      {rarity:"Red", chance:3},
+      {rarity:"Pink", chance:10},
+      {rarity:"Purple", chance:26},
+      {rarity:"Blue", chance:60.1}
+    ],
+    realistic: [
+      {rarity:"Gold", chance:0.6},
+      {rarity:"Red", chance:2.5},
+      {rarity:"Pink", chance:7},
+      {rarity:"Purple", chance:25},
+      {rarity:"Blue", chance:65.9}
+    ]
+  };
+
+  // XP za różne działania
+  const XP_PER_CASE = 10;
+  const XP_PER_SELL = 5;
+  const XP_PER_TASK = 50;
+
+  // Stan gry
+  let balance = 50;
+  let xp = 0;
+  let rankIndex = 0;
+  let inventory = [];
+  let history = [];
+  let realistic = false;
+
+  // Elementy DOM
+  const balanceEl = document.getElementById("balance");
+  const xpEl = document.getElementById("xp");
+  const rankEl = document.getElementById("rank");
+  const caseSelect = document.getElementById("caseSelect");
+  const openCaseBtn = document.getElementById("openCaseBtn");
+  const sellBtn = document.getElementById("sellBtn");
+  const dailyTaskBtn = document.getElementById("dailyTask");
+  const realisticModeCheckbox = document.getElementById("realisticMode");
+  const inventoryEl = document.getElementById("inventory");
+  const historyEl = document.getElementById("history");
+
+  // Zapis i odczyt localStorage
+  function save() {
+    localStorage.setItem("csgo_balance", balance);
+    localStorage.setItem("csgo_xp", xp);
+    localStorage.setItem("csgo_rankIndex", rankIndex);
+    localStorage.setItem("csgo_inventory", JSON.stringify(inventory));
+    localStorage.setItem("csgo_history", JSON.stringify(history));
+    localStorage.setItem("csgo_realistic", realistic);
+  }
+
+  function load() {
+    balance = parseFloat(localStorage.getItem("csgo_balance")) || 50;
+    xp = parseInt(localStorage.getItem("csgo_xp")) || 0;
+    rankIndex = parseInt(localStorage.getItem("csgo_rankIndex")) || 0;
+    inventory = JSON.parse(localStorage.getItem("csgo_inventory")) || [];
+    history = JSON.parse(localStorage.getItem("csgo_history")) || [];
+    realistic = (localStorage.getItem("csgo_realistic") === "true") || false;
+    realisticModeCheckbox.checked = realistic;
+  }
+
+  // Aktualizacja interfejsu
+  function updateUI() {
+    balanceEl.textContent = `Saldo: $${balance.toFixed(2)}`;
+    xpEl.textContent = `XP: ${xp}`;
+    rankEl.textContent = `Ranga: ${RANKS[rankIndex].name}`;
+
+    // Inventory
+    if(inventory.length === 0) {
+      inventoryEl.textContent = "Ekwipunek pusty";
+    } else {
+      inventoryEl.innerHTML = inventory.map((item, i) =>
+        `<div class="skin">
+          <div class="skin-name">${item.name} (${item.rarity})</div>
+          <div class="skin-price">$${item.price.toFixed(2)}</div>
+        </div>`).join("");
+    }
+
+    // Historia dropów
+    if(history.length === 0) {
+      historyEl.textContent = "Brak dropów";
+    } else {
+      historyEl.innerHTML = history.slice().reverse().map(h =>
+        `<div>${h.name} (${h.rarity}) - $${h.price.toFixed(2)}</div>`).join("");
+    }
+  }
+
+  // Losowanie rarity wg procentów
+  function rollRarity() {
+    const chances = realistic ? DROP_CHANCES.realistic : DROP_CHANCES.normal;
+    const rand = Math.random() * 100;
+    let sum = 0;
+    for(const ch of chances) {
+      sum += ch.chance;
+      if(rand <= sum) return ch.rarity;
+    }
+    return "Blue"; // fallback
+  }
+
+  // Losowanie skina wg rarity i dostępnych skinów
+  function rollSkin(rarity) {
+    const pool = SKINS.filter(s => s.rarity === rarity);
+    return pool[Math.floor(Math.random()*pool.length)];
+  }
+
+  // Aktualizacja rangi na podstawie XP
+  function updateRank() {
+    for(let i = RANKS.length-1; i>=0; i--) {
+      if(xp >= RANKS[i].xpNeeded) {
+        rankIndex = i;
+        break;
+      }
+    }
+  }
+
+  // Otwórz skrzynkę
+  function openCase() {
+    const casePrice = CASES[caseSelect.selectedIndex].price;
+    if(balance < casePrice) {
+      alert("Nie masz wystarczająco pieniędzy na otwarcie tej skrzynki!");
+      return;
+    }
+    balance -= casePrice;
+
+    const rarity = rollRarity();
+    const skin = rollSkin(rarity);
+
+    inventory.push(skin);
+    history.push(skin);
+
+    xp += XP_PER_CASE;
+    updateRank();
+    updateUI();
+    save();
+  }
+
+  // Sprzedaj wszystko
+  function sellAll() {
+    if(inventory.length === 0) {
+      alert("Nie masz nic do sprzedania!");
+      return;
+    }
+    let total = inventory.reduce((sum, item) => sum + item.price, 0
